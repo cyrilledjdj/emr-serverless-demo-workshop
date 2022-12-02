@@ -1,0 +1,34 @@
+name: Package and Deploy Spark Job
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  PROD_S3_BUCKET_NAME: ant309-prod-807427769151
+  OIDC_ROLE_ARN: arn:aws:iam::807427769151:role/ant309-cfn-GitHubOIDCRole-JER872IPSCJU
+  AWS_REGION: us-east-1
+      
+jobs:
+  deploy:
+    runs-on: ubuntu-20.04
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: ./pyspark
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Copy pyspark file to S3
+        run: |
+          echo Uploading ${{github.ref_name}} to S3
+          cd jobs && zip -r job_files.zip . && cd ..
+          aws s3 sync jobs s3://$PROD_S3_BUCKET_NAME/github/pyspark/jobs/${{github.ref_name}}/
