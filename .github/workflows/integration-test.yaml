@@ -1,4 +1,4 @@
- name: PySpark Integration Tests
+name: PySpark Integration Tests
 on:
   pull_request:
     types: [opened, reopened, synchronize]
