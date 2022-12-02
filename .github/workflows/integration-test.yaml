@@ -1,0 +1,39 @@
+ name: PySpark Integration Tests
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+env:
+  TEST_APPLICATION_ID: 00f60as9qsum3r09
+  TEST_S3_BUCKET_NAME: ant309-test-807427769151
+  JOB_ROLE_ARN: arn:aws:iam::807427769151:role/ant309-cfn-EMRServerlessJobRole-CV68ZQYC1YAA
+  OIDC_ROLE_ARN: arn:aws:iam::807427769151:role/ant309-cfn-GitHubOIDCRole-JER872IPSCJU
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-and-validate:
+    runs-on: ubuntu-20.04
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: ./pyspark
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Copy pyspark file to S3
+        run: |
+          echo Uploading $GITHUB_SHA to S3
+          cd jobs && zip -r job_files.zip . && cd ..
+          aws s3 sync jobs s3://$TEST_S3_BUCKET_NAME/github/pyspark/jobs/$GITHUB_SHA/
+
+      - name: Start pyspark job
+        run: |
+          scripts/integration_test.sh $TEST_APPLICATION_ID $JOB_ROLE_ARN $TEST_S3_BUCKET_NAME $GITHUB_SHA
